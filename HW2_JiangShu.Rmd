@@ -19,8 +19,6 @@ abalone = read.csv("abalone.csv")
 
 ## Question 1
 
-Your goal is to predict abalone age, which is calculated as the number of rings plus 1.5. Notice there currently is no age variable in the data set. Add age to the data set. Assess and describe the distribution of age.
-
 ```{r}
 abalone_revised <- abalone %>%
   mutate(age = rings + 1.5)
@@ -32,11 +30,9 @@ abalone_revised %>%
 
 ```
 
-We can see the distribution of abalone's age in this data set looks like normal distribution. Most abalones are about 10 years old with little abalone older than 25 or younger than 5.
+- We can see the distribution of abalone's age in this data set looks like normal distribution. Most abalones are about 10 years old with little abalone older than 25 or younger than 5.
 
 ## Question 2
-
-Split the abalone data into a training set and a testing set. Use stratified sampling. You should decide on appropriate percentages for splitting the data.Remember that you’ll need to set a seed at the beginning of the document to reproduce your results.
 
 ```{r}
 set.seed(1112)
@@ -48,7 +44,7 @@ abalone_test <- testing(abalone_split)
 
 ```
 
-The training data set size is set to be 70% of total sample size, which gives 2922 observations, while the other 30% test size gives 1255 observations.
+- The training data set size is set to be 70% of total sample size, which gives 2922 observations, while the other 30% of total sample data comprises test size and gives 1255 observations.
 
 ## Question 3
 
@@ -58,25 +54,19 @@ abalone_train_revised <- abalone_train %>%
 
 
 abalone_recipe <-
-  recipe(age ~ ., data = abalone_train_revised)%>%
-  step_dummy_multi_choice(starts_with("type"))
-  
-
-
-
-
-
-#abalone_train_revised <- abalone_train %>% 
-#  mutate(type_F = ifelse(type == "F",1,0)) %>%
-#  mutate(type_M = ifelse(type == "M",1,0)) %>%
-#  mutate(type_I = ifelse(type == "I",1,0)) %>%
-#  select(-rings)
+  recipe(age ~ ., data = abalone_train_revised) %>%
+  step_dummy(all_nominal_predictors()) %>%
+  step_interact(terms = ~ starts_with("type_") : shucked_weight) %>%
+  step_interact(terms = ~ longest_shell : diameter) %>%
+  step_interact(terms = ~ shucked_weight : shell_weight) %>%
+  step_center(all_predictors()) %>%
+  step_scale(all_predictors())
 
 ```
 
-##Question 4
+- We shouldn't use rings to predict age because the actual age we assigned to abalone is based on rings, which is essentially our outcome variable.
 
-Create and store a linear regression object using the "lm" engine.
+## Question 4
 
 ```{r}
 lm_model <- linear_reg() %>% 
@@ -85,12 +75,7 @@ lm_model <- linear_reg() %>%
 ```
 
 
-Question 5
-Now:
-set up an empty workflow,
-add the model you created in Question 4, and
-add the recipe that you created in Question 3.
-
+## Question 5
 
 ```{r}
 lm_wflow <- workflow() %>% 
@@ -101,17 +86,34 @@ lm_wflow <- workflow() %>%
 
 
 
-Question 6
-Use your fit() object to predict the age of a hypothetical female abalone with longest_shell = 0.50, diameter = 0.10, height = 0.30, whole_weight = 4, shucked_weight = 1, viscera_weight = 2, shell_weight = 1.
+## Question 6
 
 ```{r}
 lm_fit <- fit(lm_wflow,abalone_train_revised)
 
-lm_fit %>%
-  extract_fit_parsnip() %>%
-  tidy()
+predict(lm_fit, new_data = data.frame(type = "F", longest_shell = 0.50, 
+                                      diameter = 0.10, height = 0.30, 
+                                      whole_weight = 4, shucked_weight = 1,
+                                      viscera_weight = 2, shell_weight = 1))
+
+
 ```
 
+- The predicted age for the female abalone with our model is 23.36107
+
+## Question 7
+
+```{r}
+
+abalone_train_res <- predict(lm_fit, new_data = abalone_train_revised %>% select(-age))
+abalone_train_res <- bind_cols(abalone_train_res, abalone_train_revised %>% select(age))
+
+abalone_metrics <- metric_set(rsq, rmse, mae)
+abalone_metrics(abalone_train_res, truth = age, 
+                estimate = .pred)
 
 
+```
+
+- Root mean squared error is 2.11. Mean absolute error is 1.54.We see the $R^2$ value is 0.566. Generally, $R^2$ value examine the goodness of fit of a linear regression model. $R^2$ of 0.566 means our model explains 56.6% of  the variation in the response variable around its mean. This is not a particular good $R^2$ value, but it's also not that bad because we don't want make $R^2$ too large to have the problem of over fitting. 
 
